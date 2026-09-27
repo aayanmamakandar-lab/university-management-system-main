@@ -8,13 +8,50 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _env_list(name, default):
+    value = os.environ.get(name)
+    if not value:
+        return default
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _env_bool(name, default):
+    value = os.environ.get(name, str(default))
+    return value.lower() in {"1", "true", "yes", "on"}
+
+
 # SECURITY -----------------------------------------------------------------
 SECRET_KEY = os.environ.get(
-    "SECRET_KEY",
-    "django-insecure-ums-demo-key-change-me-in-production-000000000000",
+    "DJANGO_SECRET_KEY",
+    "K#2^8pM!7Zx&4*Qw$L@9dR1vN6sT3y!A%H5mC8uF2qJ7rXk9bL",
 )
-DEBUG = os.environ.get("DEBUG", "true").lower() == "true"
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
+DEBUG = _env_bool("DEBUG", True)
+ALLOWED_HOSTS = _env_list(
+    "ALLOWED_HOSTS",
+    ["localhost", "127.0.0.1", "[::1]"],
+)
+CSRF_TRUSTED_ORIGINS = _env_list(
+    "CSRF_TRUSTED_ORIGINS",
+    [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "https://localhost:8000",
+        "https://127.0.0.1:8000",
+    ],
+)
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+else:
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
 
 # APPLICATIONS -------------------------------------------------------------
 INSTALLED_APPS = [
@@ -62,9 +99,15 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # DATABASE -----------------------------------------------------------------
-_db_url = os.environ.get("DATABASE_URL")
-if _db_url:
-    DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600)}
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True,
+        )
+    }
 else:
     DATABASES = {
         "default": {
@@ -88,12 +131,12 @@ USE_I18N = True
 USE_TZ = True
 
 # STATIC & MEDIA -----------------------------------------------------------
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
